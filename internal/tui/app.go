@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/edellingham/nirimatic/internal/tui/screens"
 )
 
 // Screen represents the different screens in the app
@@ -37,9 +38,9 @@ type App struct {
 	keys          KeyMap
 	ready         bool
 
-	// Screen models (will be added as we implement them)
-	dashboard *DashboardModel
-	// niriSettings  *NiriSettingsModel
+	// Screen models
+	dashboard    *DashboardModel
+	niriSettings *screens.NiriSettingsModel
 	// animations    *AnimationsModel
 	// keybinds      *KeybindsModel
 	// startup       *StartupModel
@@ -107,8 +108,9 @@ func NewApp() *App {
 	sidebar.SetShowTitle(false)
 	sidebar.Styles.Title = SidebarTitleStyle
 
-	// Initialize dashboard
+	// Initialize screen models
 	dashboard := NewDashboardModel()
+	niriSettings := screens.NewNiriSettingsModel()
 
 	return &App{
 		currentScreen: ScreenDashboard,
@@ -116,6 +118,7 @@ func NewApp() *App {
 		keys:          DefaultKeyMap(),
 		configPath:    configPath,
 		dashboard:     dashboard,
+		niriSettings:  niriSettings,
 	}
 }
 
@@ -123,6 +126,7 @@ func NewApp() *App {
 func (a *App) Init() tea.Cmd {
 	return tea.Batch(
 		a.dashboard.Init(),
+		a.niriSettings.Init(),
 	)
 }
 
@@ -155,9 +159,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update sidebar height
 		a.sidebar.SetHeight(a.height - 6) // Account for header/footer
 
-		// Update dashboard dimensions
+		// Update screen dimensions
 		contentWidth := a.width - 28
 		a.dashboard.SetSize(contentWidth, a.height-6)
+		a.niriSettings.SetSize(contentWidth, a.height-6)
 	}
 
 	// Update sidebar
@@ -176,6 +181,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var dashCmd tea.Cmd
 		a.dashboard, dashCmd = a.dashboard.Update(msg)
 		cmds = append(cmds, dashCmd)
+	case ScreenNiriSettings:
+		var settingsCmd tea.Cmd
+		a.niriSettings, settingsCmd = a.niriSettings.Update(msg)
+		cmds = append(cmds, settingsCmd)
 	// TODO: Add other screens
 	}
 
@@ -202,7 +211,7 @@ func (a *App) View() string {
 	case ScreenDashboard:
 		content = a.dashboard.View()
 	case ScreenNiriSettings:
-		content = "Niri Settings - Coming Soon"
+		content = a.niriSettings.View()
 	case ScreenAnimations:
 		content = "Animations - Coming Soon"
 	case ScreenKeybinds:

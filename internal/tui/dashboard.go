@@ -171,6 +171,37 @@ func checkServiceStatus(name string) string {
 		return "stopped"
 	}
 
+	// For noctalia-shell, check via quickshell IPC
+	if name == "noctalia-shell" {
+		// Check if quickshell is running with noctalia-shell config
+		cmd := exec.Command("pgrep", "-f", "qs.*noctalia-shell")
+		if err := cmd.Run(); err == nil {
+			return "running"
+		}
+		// Also try checking via qs ipc (if available)
+		cmd = exec.Command("qs", "-c", "noctalia-shell", "ipc", "call", "root", "ping")
+		if err := cmd.Run(); err == nil {
+			return "running"
+		}
+		return "stopped"
+	}
+
+	// For stasis, check the systemd user service
+	if name == "stasis" {
+		cmd := exec.Command("systemctl", "--user", "is-active", "stasis")
+		output, _ := cmd.Output()
+		status := strings.TrimSpace(string(output))
+		if status == "active" {
+			return "running"
+		}
+		// Fallback: check if stasis process is running
+		cmd = exec.Command("pgrep", "-x", "stasis")
+		if err := cmd.Run(); err == nil {
+			return "running"
+		}
+		return "stopped"
+	}
+
 	// For other services, check systemd user services
 	cmd := exec.Command("systemctl", "--user", "is-active", name)
 	output, _ := cmd.Output()
