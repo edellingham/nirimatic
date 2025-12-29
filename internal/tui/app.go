@@ -209,17 +209,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.niriSettings.SetSize(contentWidth, a.height-6)
 	}
 
-	// Pass non-key messages to current screen
-	switch a.currentScreen {
-	case ScreenDashboard:
-		var dashCmd tea.Cmd
-		a.dashboard, dashCmd = a.dashboard.Update(msg)
-		cmds = append(cmds, dashCmd)
-	case ScreenNiriSettings:
-		var settingsCmd tea.Cmd
-		a.niriSettings, settingsCmd = a.niriSettings.Update(msg)
-		cmds = append(cmds, settingsCmd)
-	}
+	// Pass non-key messages to ALL screens so they can process their own messages
+	// (e.g., configLoadedMsg, serviceStatusMsg, etc.)
+	var dashCmd tea.Cmd
+	a.dashboard, dashCmd = a.dashboard.Update(msg)
+	cmds = append(cmds, dashCmd)
+
+	var settingsCmd tea.Cmd
+	a.niriSettings, settingsCmd = a.niriSettings.Update(msg)
+	cmds = append(cmds, settingsCmd)
 
 	return a, tea.Batch(cmds...)
 }
