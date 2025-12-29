@@ -283,7 +283,7 @@ func (m *NiriSettingsModel) syncFromConfig() {
 
 // syncToConfig syncs field values to the config
 func (m *NiriSettingsModel) syncToConfig() {
-	if m.config == nil {
+	if m.config == nil || len(m.fields) < 9 {
 		return
 	}
 
@@ -347,7 +347,17 @@ func (m *NiriSettingsModel) loadConfig() tea.Cmd {
 
 // saveConfig saves the config file
 func (m *NiriSettingsModel) saveConfig() tea.Cmd {
-	return func() tea.Msg {
+	return func() (msg tea.Msg) {
+		// Recover from any panics
+		defer func() {
+			if r := recover(); r != nil {
+				msg = configSavedMsg{err: fmt.Errorf("save failed: %v", r)}
+			}
+		}()
+
+		if m.config == nil {
+			return configSavedMsg{err: fmt.Errorf("no config loaded")}
+		}
 		m.syncToConfig()
 		err := config.SaveNiriConfig(m.config)
 		return configSavedMsg{err: err}

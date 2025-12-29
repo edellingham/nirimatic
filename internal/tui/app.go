@@ -29,6 +29,11 @@ const (
 // App version
 const Version = "0.1.0"
 
+// ASCII Logo
+const Logo = `░█▀█░▀█▀░█▀▄░▀█▀░█▄█░█▀█░▀█▀░▀█▀░█▀▀
+░█░█░░█░░█▀▄░░█░░█░█░█▀█░░█░░░█░░█░░
+░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀▀`
+
 // App is the main application model
 type App struct {
 	currentScreen Screen
@@ -230,7 +235,7 @@ func (a *App) View() string {
 	header := HeaderStyle.Width(a.width - 4).Render(headerText)
 
 	// Render sidebar with focus indicator
-	sidebarContent := SidebarTitleStyle.Render("nirimatic") + "\n\n" + a.sidebar.View()
+	sidebarContent := GradientText("nirimatic") + "\n\n" + a.sidebar.View()
 	sidebarStyle := SidebarStyle.Height(a.height - 6)
 	if !a.focusContent {
 		sidebarStyle = sidebarStyle.BorderForeground(ColorCyan) // Highlight when focused
