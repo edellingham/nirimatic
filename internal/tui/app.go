@@ -37,6 +37,7 @@ type App struct {
 	height        int
 	keys          KeyMap
 	ready         bool
+	focusContent  bool // true = content focused, false = sidebar focused
 
 	// Screen models
 	dashboard    *DashboardModel
@@ -136,6 +137,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Global keys work regardless of focus
 		switch {
 		case key.Matches(msg, a.keys.Quit):
 			if a.configDirty {
@@ -149,6 +151,43 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, a.keys.Reload):
 			return a, reloadNiriConfig()
+		}
+
+		// Focus switching
+		if a.focusContent {
+			// Escape returns to sidebar
+			if msg.String() == "esc" {
+				a.focusContent = false
+				return a, nil
+			}
+			// Route to content screen
+			switch a.currentScreen {
+			case ScreenDashboard:
+				var dashCmd tea.Cmd
+				a.dashboard, dashCmd = a.dashboard.Update(msg)
+				cmds = append(cmds, dashCmd)
+			case ScreenNiriSettings:
+				var settingsCmd tea.Cmd
+				a.niriSettings, settingsCmd = a.niriSettings.Update(msg)
+				cmds = append(cmds, settingsCmd)
+			}
+			return a, tea.Batch(cmds...)
+		} else {
+			// Sidebar focused: Enter switches to content
+			if key.Matches(msg, a.keys.Enter) {
+				a.focusContent = true
+				return a, nil
+			}
+			// Update sidebar navigation
+			var cmd tea.Cmd
+			a.sidebar, cmd = a.sidebar.Update(msg)
+			cmds = append(cmds, cmd)
+
+			// Check for screen change
+			if item, ok := a.sidebar.SelectedItem().(sidebarItem); ok {
+				a.currentScreen = item.screen
+			}
+			return a, tea.Batch(cmds...)
 		}
 
 	case tea.WindowSizeMsg:
@@ -165,17 +204,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.niriSettings.SetSize(contentWidth, a.height-6)
 	}
 
-	// Update sidebar
-	var cmd tea.Cmd
-	a.sidebar, cmd = a.sidebar.Update(msg)
-	cmds = append(cmds, cmd)
-
-	// Check for screen change
-	if item, ok := a.sidebar.SelectedItem().(sidebarItem); ok {
-		a.currentScreen = item.screen
-	}
-
-	// Update current screen
+	// Pass non-key messages to current screen
 	switch a.currentScreen {
 	case ScreenDashboard:
 		var dashCmd tea.Cmd
@@ -185,7 +214,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var settingsCmd tea.Cmd
 		a.niriSettings, settingsCmd = a.niriSettings.Update(msg)
 		cmds = append(cmds, settingsCmd)
-	// TODO: Add other screens
 	}
 
 	return a, tea.Batch(cmds...)
@@ -201,9 +229,13 @@ func (a *App) View() string {
 	headerText := GradientText("▄▄ nirimatic") + "  v" + Version
 	header := HeaderStyle.Width(a.width - 4).Render(headerText)
 
-	// Render sidebar
+	// Render sidebar with focus indicator
 	sidebarContent := SidebarTitleStyle.Render("nirimatic") + "\n\n" + a.sidebar.View()
-	sidebar := SidebarStyle.Height(a.height - 6).Render(sidebarContent)
+	sidebarStyle := SidebarStyle.Height(a.height - 6)
+	if !a.focusContent {
+		sidebarStyle = sidebarStyle.BorderForeground(ColorCyan) // Highlight when focused
+	}
+	sidebar := sidebarStyle.Render(sidebarContent)
 
 	// Render current screen content
 	var content string
@@ -223,16 +255,29 @@ func (a *App) View() string {
 	}
 
 	contentWidth := a.width - 28
-	contentBox := ContentStyle.Width(contentWidth).Height(a.height - 6).Render(content)
+	contentStyle := ContentStyle.Width(contentWidth).Height(a.height - 6)
+	if a.focusContent {
+		contentStyle = contentStyle.BorderForeground(ColorCyan) // Highlight when focused
+	}
+	contentBox := contentStyle.Render(content)
 
 	// Layout main area
 	main := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, contentBox)
 
-	// Render footer help
-	help := HelpStyle.Render(HelpLine(
-		a.keys.Up, a.keys.Down, a.keys.Enter,
-		a.keys.Noctalia, a.keys.Reload, a.keys.Quit, a.keys.Help,
-	))
+	// Render footer help based on focus
+	var helpText string
+	if a.focusContent {
+		helpText = DimmedStyle.Render("esc") + " back  " + HelpLine(
+			a.keys.Up, a.keys.Down, a.keys.Enter,
+			a.keys.Noctalia, a.keys.Reload, a.keys.Quit, a.keys.Help,
+		)
+	} else {
+		helpText = HelpLine(
+			a.keys.Up, a.keys.Down, a.keys.Enter,
+			a.keys.Noctalia, a.keys.Reload, a.keys.Quit, a.keys.Help,
+		)
+	}
+	help := HelpStyle.Render(helpText)
 
 	return lipgloss.JoinVertical(lipgloss.Left, header, main, help)
 }
